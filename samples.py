@@ -55,12 +55,14 @@ class Datum:
     Create a new datum from file input (standard MNIST encoding).
     """
     DATUM_HEIGHT = height
-    DATUM_WIDTH=width
+    DATUM_WIDTH = width
     self.height = DATUM_HEIGHT
     self.width = DATUM_WIDTH
     if data == None:
+      # print("NO DATA")
       data = [[' ' for i in range(DATUM_WIDTH)] for j in range(DATUM_HEIGHT)] 
-    self.pixels = util.arrayInvert(convertToInteger(data)) 
+    self.pixels = util.arrayInvert(convertToInteger(data))
+    # print("SELF>PIXELS: " + str(self.pixels)) 
     
   def getPixel(self, column, row):
     """
@@ -104,14 +106,19 @@ def loadDataFile(filename, n,width,height):
   fin.reverse()
   items = []
   for i in range(n):
+    # print("i: " + str(i))
     data = []
     for j in range(height):
-      data.append(list(fin.pop()))
+      # print("j: " + str(j))
+      f = list(fin.pop())
+      # print("fin.pop(): " + str(f))
+      data.append(f)
     if len(data[0]) < DATUM_WIDTH-1:
       # we encountered end of file...
       print ("Truncating at %d examples (maximum)" % i)
       break
     items.append(Datum(data,DATUM_WIDTH,DATUM_HEIGHT))
+  # print("ITEMS: " + str(items))
   return items
 
 import zipfile
@@ -122,7 +129,9 @@ def readlines(filename):
     return [l[:-1] for l in open(filename).readlines()]
   else: 
     z = zipfile.ZipFile('data.zip')
-    return z.read(filename).decode().split('\n')
+    w = z.read(filename).decode().split('\n')
+    # print("READLINES: " + str(w))
+    return w
     
 def loadLabelsFile(filename, n):
   """
@@ -133,6 +142,7 @@ def loadLabelsFile(filename, n):
   for line in fin[:min(n, len(fin))]:
     if line == '':
         break
+    # print("samples.py| Label: "+str(line))
     labels.append(int(line))
   return labels
   
@@ -151,6 +161,7 @@ def IntegerConversionFunction(character):
   """
   Helper function for file reading.
   """
+  # print("char: " + str(character))
   if(character == ' '):
     return 0
   elif(character == '+'):
@@ -162,10 +173,11 @@ def convertToInteger(data):
   """
   Helper function for file reading.
   """
+  # print("DATA: " + str(data))
   if type(data) != type([]):
     return IntegerConversionFunction(data)
   else:
-    return map(convertToInteger, data)
+    return list(map(convertToInteger, data))
 
 # Testing
 
@@ -177,9 +189,10 @@ def _test():
 #  labels = loadLabelsFile("facedata/facedatatrainlabels", n)
   items = loadDataFile("digitdata/trainingimages", n,28,28)
   labels = loadLabelsFile("digitdata/traininglabels", n)
-  for i in range(1):
-    print (items[i])
-    print (items[i])
+  print("Labels: " + str(labels))
+  for i in range(n):
+    # print (items[i])
+    # print (items[i])
     print (items[i].height)
     print (items[i].width)
     print (dir(items[i]))

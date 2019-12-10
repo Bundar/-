@@ -167,10 +167,13 @@ class Counter(dict):
     Returns the key with the highest value.
     """
     if len(self.keys()) == 0: return None
-    all = self.items()
+    all = list(self.items())
     values = [x[1] for x in all]
+    # print("Values: " + str(values))
     maxIndex = values.index(max(values))
-    return values[maxIndex]###UNSURE ABOUT THIS TODO
+    # print("MaxIndex: " + str(maxIndex))
+    # print("ALL: " + str(all))
+    return all[maxIndex][0]
   
   def sortedKeys(self):
     """

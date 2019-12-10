@@ -30,7 +30,7 @@ def basicFeatureExtractorDigit(datum):
   each pixel in the provided datum is white (0) or gray/black (1)
   """
   a = datum.getPixels()
-
+  # print("datum.getPixels: " + str(a))
   features = util.Counter()
   for x in range(DIGIT_DATUM_WIDTH):
     for y in range(DIGIT_DATUM_HEIGHT):
@@ -54,6 +54,7 @@ def basicFeatureExtractorFace(datum):
         features[(x,y)] = 1
       else:
         features[(x,y)] = 0
+
   return features
 
 def enhancedFeatureExtractorDigit(datum):
@@ -64,12 +65,93 @@ def enhancedFeatureExtractorDigit(datum):
   for this datum (datum is of type samples.Datum).
   
   ## DESCRIBE YOUR ENHANCED FEATURES HERE...
-  
+  Diagonal Feature Extraction:
+  1. Split image into zones
+  2. for each zone sum along diagonals and average all totals to get one feature
+
+
+  ref: https://pdfs.semanticscholar.org/ddd8/29ecd1c1fdef2b04d2b61027a68e316e170e.pdf
+  'Diagonal Feature Extraction Based Handwritten Character System Using Neural Network'
   ##
   """
-  features =  basicFeatureExtractorDigit(datum)
 
-  "*** YOUR CODE HERE ***"
+  # features = basicFeatureExtractorDigit(datum)
+
+  # breaks = 0
+  # pixels = datum.getPixels()
+  # nonzero = 0
+  # firstLeft = None
+  # aboveCenter = 0
+
+  # for i in range(len(pixels)):
+  #   for j in range(1, len(pixels[i])):
+  #     if pixels[i][j] != 0:
+  #       nonzero += 1
+  #       if not firstLeft or j < firstLeft:
+  #         firstLeft = j
+  #       if j <= (len(pixels) + 1)/2:
+  #         aboveCenter += 1
+  #     if pixels[i][j] != pixels[i][j - 1]:
+  #       breaks += 1
+
+  # width = len(pixels[0]) - (firstLeft * 2)
+  # firstTop = None
+  # pastRight = 0
+
+  # for j in range(len(pixels[0])):
+  #   column = [p[j] for p in pixels]
+  #   for i in range(1, len(column)):
+  #     if column[j] != 0:
+  #       nonzero += 1
+  #       if not firstTop or i < firstTop:
+  #         firstTop = i
+  #       if i <= (len(pixels[0]) + 1)/2:
+  #         pastRight += 1
+  #     if column[i] != column[i - 1]:
+  #       breaks += 1
+
+  # height = len(pixels) - (firstTop * 2)
+  # aspectRatio = float(width)/height
+  # for n in range(5):
+  #       features[n] = breaks > 175 and 1.0 or 0.0
+
+  # for n in range(10):
+  #     features[(n + 1) * 10] = aspectRatio < 0.69
+
+  # for n in range(5):
+  #     features[-n] = nonzero > 300 and 1.0 or 0.0
+
+  # percentAbove = float(aboveCenter) / nonzero
+  # for n in range(5):
+  #     features[-(n + 1) * 10] = percentAbove > 0.35 and 1.0 or 0.0
+
+  # percentRight = float(pastRight) / nonzero
+  # for n in range(1000, 1005):
+  #     features[n] = percentRight < 0.27 and 1.0 or 0.0
+
+  # return features
+
+  a = datum.getPixels()
+  features = util.Counter()
+
+  #dim of each zone ... should be a factor of 28
+  m = 2
+  N = 10 # how many times to replicate non zero features
+
+  i = 0
+  for x in range(0,DIGIT_DATUM_WIDTH, m):
+    for y in range(0, DIGIT_DATUM_HEIGHT, m):
+      d1 = datum.getPixel(x,y)
+      d2 = datum.getPixel(x+1, y) + datum.getPixel(x, y+1)
+      # d2 = d2 /2
+      d3 = datum.getPixel(x+1, y+1)
+      avg = d1+d2+d3 / 3
+      # print("(x,y) = " + str((x,y)) + " avg = " + str(avg))
+      features[i] = avg
+      if avg > 0:
+        for n in range(1,N):
+          features[i+n] = avg
+      i += N
   
   return features
 
@@ -287,8 +369,6 @@ def runClassifier(args, options):
   featureFunction = args['featureFunction']
   classifier = args['classifier']
   printImage = args['printImage']
-
-  print("featureFunction: " + str(featureFunction))
       
   # Load data  
   numTraining = options.training
@@ -312,15 +392,18 @@ def runClassifier(args, options):
   
   # Extract features
   print ("Extracting features...")
-  trainingData = map(featureFunction, rawTrainingData)
-  validationData = map(featureFunction, rawValidationData)
-  testData = map(featureFunction, rawTestData)
-  
+  trainingData = list(map(featureFunction, rawTrainingData))
+  validationData = list(map(featureFunction, rawValidationData))
+  testData = list(map(featureFunction, rawTestData))
+
+
+  # print("Test Labels: " + str(testLabels))
   # Conduct training and testing
   print ("Training...")
   classifier.train(trainingData, trainingLabels, validationData, validationLabels)
   print ("Validating...")
   guesses = classifier.classify(validationData)
+  # print("Guesses: " + str(guesses))
   correct = [guesses[i] == validationLabels[i] for i in range(len(validationLabels))].count(True)
   print (str(correct), ("correct out of " + str(len(validationLabels)) + " (%.1f%%).") % (100.0 * correct / len(validationLabels)))
   print ("Testing...")
