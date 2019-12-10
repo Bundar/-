@@ -41,17 +41,20 @@ class PerceptronClassifier:
     (and thus represents a vector a values).
     """
     
-    self.features = trainingData[0].keys() # could be useful later
-    # DO NOT ZERO OUT YOUR WEIGHTS BEFORE STARTING TRAINING, OR
-    # THE AUTOGRADER WILL LIKELY DEDUCT POINTS.
+    self.features = trainingData[0].keys()
+    numErrors = 0
     
     for iteration in range(self.max_iterations):
+      if iteration > 0:
+        print("Number of Errors Detected: " + str(numErrors))
+        numErrors = 0
       print("Starting iteration ", iteration, "...")
-      for i in range(len(trainingData)):
+      for i in range(len(trainingData)):          
           data = trainingData[i]
           actual = trainingLabels[i]
           prediction = self.classify([data])[0]
           if actual != prediction:
+            numErrors += 1
             self.weights[actual] = self.weights[actual] + data
             self.weights[prediction] = self.weights[prediction] - data
 

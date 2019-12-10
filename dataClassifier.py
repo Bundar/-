@@ -16,6 +16,7 @@ import mira
 import samples
 import sys
 import util
+import time
 
 TEST_SET_SIZE = 100
 DIGIT_DATUM_WIDTH=28
@@ -72,67 +73,121 @@ def enhancedFeatureExtractorDigit(datum):
 
   ref: https://pdfs.semanticscholar.org/ddd8/29ecd1c1fdef2b04d2b61027a68e316e170e.pdf
   'Diagonal Feature Extraction Based Handwritten Character System Using Neural Network'
+
+
+  Also check for loops as only some numbers have loops. 
   ##
   """
 
-  # features = basicFeatureExtractorDigit(datum)
-
-  # breaks = 0
-  # pixels = datum.getPixels()
-  # nonzero = 0
-  # firstLeft = None
-  # aboveCenter = 0
-
-  # for i in range(len(pixels)):
-  #   for j in range(1, len(pixels[i])):
-  #     if pixels[i][j] != 0:
-  #       nonzero += 1
-  #       if not firstLeft or j < firstLeft:
-  #         firstLeft = j
-  #       if j <= (len(pixels) + 1)/2:
-  #         aboveCenter += 1
-  #     if pixels[i][j] != pixels[i][j - 1]:
-  #       breaks += 1
-
-  # width = len(pixels[0]) - (firstLeft * 2)
-  # firstTop = None
-  # pastRight = 0
-
-  # for j in range(len(pixels[0])):
-  #   column = [p[j] for p in pixels]
-  #   for i in range(1, len(column)):
-  #     if column[j] != 0:
-  #       nonzero += 1
-  #       if not firstTop or i < firstTop:
-  #         firstTop = i
-  #       if i <= (len(pixels[0]) + 1)/2:
-  #         pastRight += 1
-  #     if column[i] != column[i - 1]:
-  #       breaks += 1
-
-  # height = len(pixels) - (firstTop * 2)
-  # aspectRatio = float(width)/height
-  # for n in range(5):
-  #       features[n] = breaks > 175 and 1.0 or 0.0
-
-  # for n in range(10):
-  #     features[(n + 1) * 10] = aspectRatio < 0.69
-
-  # for n in range(5):
-  #     features[-n] = nonzero > 300 and 1.0 or 0.0
-
-  # percentAbove = float(aboveCenter) / nonzero
-  # for n in range(5):
-  #     features[-(n + 1) * 10] = percentAbove > 0.35 and 1.0 or 0.0
-
-  # percentRight = float(pastRight) / nonzero
-  # for n in range(1000, 1005):
-  #     features[n] = percentRight < 0.27 and 1.0 or 0.0
-
-  # return features
-
   a = datum.getPixels()
   features = util.Counter()
+
+  closedLoop = False
+
+  N = 4    # how many times to replicate non zero features
+
+  i = 0
+  for x in range(0,DIGIT_DATUM_WIDTH, 2):
+    for y in range(0, DIGIT_DATUM_HEIGHT, 2):
+      d1 = datum.getPixel(x,y)
+      d2 = datum.getPixel(x+1, y) + datum.getPixel(x, y+1)
+      # d2 = d2 /2
+      d3 = datum.getPixel(x+1, y+1)
+      avg = d1+d2+d3 / 3
+      # print("(x,y) = " + str((x,y)) + " avg = " + str(avg))
+      features[i] = avg
+      if avg > 0:
+        for n in range(1,N):
+          features[i+n] = avg
+      i += N
+  
+  for x in range(DIGIT_DATUM_WIDTH):
+    for y in range(DIGIT_DATUM_HEIGHT):
+      visited={}
+      if datum.getPixel(x,y) == 0:
+        if dfs(datum, x,y,visited):
+          closedLoop=True
+          break
+  if closedLoop:
+    for n in range(1,N):
+      features["containsLoop"+str(n)] = 1
+
+  vertScore = calcSymmetryScoreVert(datum)
+  horiScore = calcSymmetryScoreHori(datum)
+
+  # print("H Score: " + str(horiScore))
+  # print("V Score: " + str(vertScore))
+  features['vertical'] = vertScore
+  features['horizontal'] = horiScore
+
+
+  if vertScore > 0.5:
+    for n in range(1,N):
+      features['vertical'+str(n)] = vertScore
+  if horiScore > 0.5:
+    for n in range(1,N):
+      features['horizontal'+str(n)] = horiScore
+
+  horizontalEdgeProportion = lookForHorizontalEdges(datum, DIGIT_DATUM_WIDTH, DIGIT_DATUM_HEIGHT)
+  
+  for n in range(1,N):
+    features['edge'+str(n)] = horizontalEdgeProportion
+
+  verticalEdgeProportion = lookForVerticalEdges(datum, DIGIT_DATUM_WIDTH, DIGIT_DATUM_HEIGHT)
+  
+  for n in range(1,N):
+    features['edge'+str(n)] = verticalEdgeProportion
+
+  return features
+
+def calcSymmetryScoreVert(datum):
+  score = 0
+  count = 0
+  for x in range(int(DIGIT_DATUM_WIDTH/2)):
+    for y in range(DIGIT_DATUM_HEIGHT):
+      # print("x,y " + str(x) + ", " + str(y))
+      p = datum.getPixel(x,y)
+      q = datum.getPixel(DIGIT_DATUM_WIDTH-x-1,y)
+      count+=1
+      if p == q:
+        score += 1
+
+  return score/count
+
+def calcSymmetryScoreHori(datum):
+  score = 0
+  count = 0
+  for y in range(0,int(DIGIT_DATUM_HEIGHT/2)):
+    for x in range(DIGIT_DATUM_WIDTH):
+      p = datum.getPixel(x,y)
+      q = datum.getPixel(x,DIGIT_DATUM_HEIGHT-y-1)
+      count += 1
+      if p == q:
+        score += 1
+
+  return score/count
+
+
+def dfs(datum, x,y, visited):
+  if x<0 or x>=DIGIT_DATUM_WIDTH:
+    return False
+  if y<0 or y>=DIGIT_DATUM_HEIGHT:
+    return False
+  if datum.getPixel(x,y) > 0:
+    return True
+  if (x,y) in visited.keys():
+    return True
+  visited[(x,y)] = True
+  return dfs(datum, x-1,y, visited) and dfs(datum, x+1,y,visited) and dfs(datum, x, y-1,visited) and dfs(datum, x, y+1,visited)
+
+def enhancedFeatureExtractorFace(datum):
+  """
+  Your feature extraction playground for faces.
+  It is your choice to modify this.
+  """
+  a = datum.getPixels()
+  features = util.Counter()
+  closedLoop = False
 
   #dim of each zone ... should be a factor of 28
   m = 2
@@ -152,25 +207,115 @@ def enhancedFeatureExtractorDigit(datum):
         for n in range(1,N):
           features[i+n] = avg
       i += N
-  
+
+  vertScore = calcSymmetryScoreVert(datum)
+  horiScore = calcSymmetryScoreHori(datum)
+
+  # print("H Score: " + str(horiScore))
+  # print("V Score: " + str(vertScore))
+  features['vertical'] = vertScore
+  features['horizontal'] = horiScore
+
+
+  if vertScore > 0.5:
+    for n in range(1,N):
+      features['vertical'+str(n)] = vertScore
+  if horiScore > 0.5:
+    for n in range(1,N):
+      features['horizontal'+str(n)] = horiScore
+
+  horizontalEdgeProportion = lookForHorizontalEdges(datum, FACE_DATUM_WIDTH, FACE_DATUM_HEIGHT)
+  features['edge'] = horizontalEdgeProportion
+  if horizontalEdgeProportion > 0.5:
+    for n in range(1,N):
+      features['edge'+str(n)] = horizontalEdgeProportion
+
+  verticalEdgeProportion = lookForVerticalEdges(datum, FACE_DATUM_WIDTH, FACE_DATUM_HEIGHT)
+  features['edge'] = verticalEdgeProportion
+  if verticalEdgeProportion > 0.5:
+    for n in range(1,N):
+      features['edge'+str(n)] = verticalEdgeProportion
+
+  for x in range(DIGIT_DATUM_WIDTH):
+    for y in range(DIGIT_DATUM_HEIGHT):
+      visited={}
+      if datum.getPixel(x,y) == 0:
+        if dfs(datum, x,y,visited):
+          closedLoop=True
+          break
+  if closedLoop:
+    for n in range(1,N):
+      features["containsLoop"+str(n)] = 1
   return features
 
+def lookForHorizontalEdges(datum, width, height):
+  score = 0
+  count = 0
+  maxEdgeProportion = -1
+  for x in range(width):
+    for y in range(height):
+      p = datum.getPixel(x,y)
+      countToTheLeft = lookLeft(datum, x, y)
+      countToTheRight = lookRight(datum, x, y, width)
+      edgeProportion = float(countToTheRight + countToTheLeft)/width
+      if edgeProportion > maxEdgeProportion:
+        maxEdgeProportion = edgeProportion
 
-def contestFeatureExtractorDigit(datum):
-  """
-  Specify features to use for the minicontest
-  """
-  features =  basicFeatureExtractorDigit(datum)
-  return features
+  return maxEdgeProportion
 
-def enhancedFeatureExtractorFace(datum):
-  """
-  Your feature extraction playground for faces.
-  It is your choice to modify this.
-  """
-  features =  basicFeatureExtractorFace(datum)
-  return features
+def lookLeft(datum, x, y):
+  p = datum.getPixel(x,y)
+  count = 0
+  i = x
+  while i>0 and datum.getPixel(i,y) == p:
+    count += 1
+    i += -1
 
+  return count
+
+def lookRight(datum, x, y, width):
+  p = datum.getPixel(x,y)
+  count = 0
+  i = x
+  while i<width and datum.getPixel(i,y) == p:
+    count += 1
+    i += 1
+
+  return count
+def lookForVerticalEdges(datum, width, height):
+  score = 0
+  count = 0
+  maxEdgeProportion = -1
+  for x in range(width):
+    for y in range(height):
+      p = datum.getPixel(x,y)
+      countUp = lookUp(datum, x, y)
+      countDown = lookDown(datum, x, y, height)
+      edgeProportion = float(countUp + countDown)/height
+      if edgeProportion > maxEdgeProportion:
+        maxEdgeProportion = edgeProportion
+
+  return maxEdgeProportion
+
+def lookUp(datum, x, y):
+  p = datum.getPixel(x,y)
+  count = 0
+  i = x
+  while i>0 and datum.getPixel(x,i) == p:
+    count += 1
+    i += -1
+
+  return count
+
+def lookDown(datum, x, y, height):
+  p = datum.getPixel(x,y)
+  count = 0
+  i = x
+  while i<height and datum.getPixel(x,i) == p:
+    count += 1
+    i += 1
+
+  return count
 def analysis(classifier, guesses, testLabels, testData, rawTestData, printImage):
   """
   This function is called after learning.
@@ -390,6 +535,11 @@ def runClassifier(args, options):
     testLabels = samples.loadLabelsFile("digitdata/testlabels", numTest)
     
   
+
+  ###
+  ##Start Timing
+  ###
+  start_time = time.time()
   # Extract features
   print ("Extracting features...")
   trainingData = list(map(featureFunction, rawTrainingData))
@@ -401,28 +551,33 @@ def runClassifier(args, options):
   # Conduct training and testing
   print ("Training...")
   classifier.train(trainingData, trainingLabels, validationData, validationLabels)
+
+  ###
+  ##Start Timing
+  ###
+  end_time = time.time()
+
   print ("Validating...")
   guesses = classifier.classify(validationData)
   # print("Guesses: " + str(guesses))
   correct = [guesses[i] == validationLabels[i] for i in range(len(validationLabels))].count(True)
   print (str(correct), ("correct out of " + str(len(validationLabels)) + " (%.1f%%).") % (100.0 * correct / len(validationLabels)))
   print ("Testing...")
+
+  classification_time_start = time.time()
+
+
   guesses = classifier.classify(testData)
+
+  classification_time_end = time.time()
+
   correct = [guesses[i] == testLabels[i] for i in range(len(testLabels))].count(True)
   print (str(correct), ("correct out of " + str(len(testLabels)) + " (%.1f%%).") % (100.0 * correct / len(testLabels)))
-  analysis(classifier, guesses, testLabels, testData, rawTestData, printImage)
+  # analysis(classifier, guesses, testLabels, testData, rawTestData, printImage)
   
-  # do odds ratio computation if specified at command line
-  if((options.odds) & (options.classifier == "naiveBayes" or (options.classifier == "nb")) ):
-    label1, label2 = options.label1, options.label2
-    features_odds = classifier.findHighOddsFeatures(label1,label2)
-    if(options.classifier == "naiveBayes" or options.classifier == "nb"):
-      string3 = "=== Features with highest odd ratio of label %d over label %d ===" % (label1, label2)
-    else:
-      string3 = "=== Features for which weight(label %d)-weight(label %d) is biggest ===" % (label1, label2)    
-      
-    print(string3)
-    printImage(features_odds)
+  print("Time To Train: " + str(end_time - start_time))
+  print("Time To Classify: " + str(classification_time_end - classification_time_start))
+
 
   if((options.weights) & (options.classifier == "perceptron")):
     for l in classifier.legalLabels:

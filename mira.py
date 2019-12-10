@@ -54,8 +54,33 @@ class MiraClassifier:
     datum is a counter from features to values for those features
     representing a vector of values.
     """
-    "*** YOUR CODE HERE ***"
-    util.raiseNotDefined()
+    bestWeight = None
+    bestCorrect = 0.0
+    weights = self.weights.copy()
+    
+    for c in Cgrid:
+      self.weights = weights.copy()
+      for iteration in range(self.max_iterations):
+        for i in range(len(trainingData)):
+            data = trainingData[i]
+            actual = trainingLabels[i]
+            prediction = self.classify([data])[0]
+            if actual != prediction:
+              f = data.copy()
+              t = min(c, ((self.weights[prediction] - self.weights[actual])*f + 1.0)/(2.0*(f*f)))
+              f.divideAll(1.0/t)
+              self.weights[actual] = self.weights[actual] + f
+              self.weights[prediction] = self.weights[prediction] - f
+      correct = 0
+      guesses = self.classify(validationData)
+      for i in guesses:
+        guess = guesses[i]
+        if validationLabels[i] == guess:
+          correct += 1
+      if correct > bestCorrect:
+        bestCorrect = correct
+        bestWeight = self.weights
+    self.weights = bestWeight
 
   def classify(self, data ):
     """
@@ -71,17 +96,3 @@ class MiraClassifier:
         vectors[l] = self.weights[l] * datum
       guesses.append(vectors.argMax())
     return guesses
-
-  
-  def findHighOddsFeatures(self, label1, label2):
-    """
-    Returns a list of the 100 features with the greatest difference in feature values
-                     w_label1 - w_label2
-
-    """
-    featuresOdds = []
-
-    "*** YOUR CODE HERE ***"
-
-    return featuresOdds
-

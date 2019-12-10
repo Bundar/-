@@ -60,8 +60,6 @@ class NaiveBayesClassifier(classificationMethod.ClassificationMethod):
     self.legalLabels.
     """
 
-    
-
     # This is the prob over all labels
     commonPrior = util.Counter()
 
@@ -151,7 +149,8 @@ class NaiveBayesClassifier(classificationMethod.ClassificationMethod):
     logJoint = util.Counter()
     
     for l in self.legalLabels:
-        logJoint[l] = math.log(self.prior[l])
+        y = self.prior[l]
+        logJoint[l] = math.log(y if y > 0 else 1)
         for feature, value in datum.items():
             if value > 0 :
                 # print("Value: " + str(value))
